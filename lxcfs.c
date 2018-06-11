@@ -69,6 +69,57 @@ static void users_unlock(void)
 	unlock_mutex(&user_count_mutex);
 }
 
+static pthread_t loadavg_pid = 0;
+
+/* Returns zero on success */
+static int start_loadavg(void) {
+	char *error;
+	pthread_t (*load_daemon)(int);
+
+	dlerror();    /* Clear any existing error */
+
+	load_daemon = (pthread_t (*)(int)) dlsym(dlopen_handle, "load_daemon");
+	error = dlerror();
+	if (error != NULL) {
+		lxcfs_error("load_daemon fails:%s\n", error);
+		return 1;
+	}
+	loadavg_pid = load_daemon(1);
+	if (loadavg_pid == 0)
+		return 1;
+
+	return 0;
+}
+
+/* Returns zero on success */
+static int stop_loadavg(void) {
+	int s;
+	char *error;
+	void (*load_free)(void);
+
+	s = pthread_cancel(loadavg_pid);
+	if (s == 0) {
+		s = pthread_join(loadavg_pid, NULL); /* Make sure sub thread has been canceled. */
+		if (s != 0) {
+			lxcfs_error("%s\n", "load_free error!");
+			return 1;
+		}
+		dlerror();    /* Clear any existing error */
+
+		load_free = (void (*)(void)) dlsym(dlopen_handle, "load_free");
+		error = dlerror();
+		if (error != NULL) {
+			lxcfs_error("load_free error: %s\n", error);
+			return 1;
+		}
+		load_free();
+	} else {
+		lxcfs_error("%s\n", "load_free error!");
+	}
+
+	return 0;
+}
+
 static volatile sig_atomic_t need_reload;
 
 /* do_reload - reload the dynamic library.  Done under
@@ -76,6 +127,10 @@ static volatile sig_atomic_t need_reload;
 static void do_reload(void)
 {
 	char lxcfs_lib_path[PATH_MAX];
+
+	if (loadavg_pid > 0)
+		stop_loadavg();
+
 	if (dlopen_handle) {
 		lxcfs_debug("%s\n", "Closing liblxcfs.so handle.");
 		dlclose(dlopen_handle);
@@ -101,6 +156,9 @@ static void do_reload(void)
 	}
 
 good:
+	if (loadavg_pid > 0)
+		start_loadavg();
+
 	if (need_reload)
 		lxcfs_error("%s\n", "lxcfs: reloaded");
 	need_reload = 0;
@@ -849,12 +907,7 @@ int main(int argc, char *argv[])
 	char *pidfile = NULL, *saveptr = NULL, *token = NULL, *v = NULL;
 	size_t pidfile_len;
 	bool debug = false, nonempty = false;
-	pthread_t pid;
-	int s = 0;
-	char *error;
 	bool load_use = false;
-	pthread_t (*load_daemon)(int);
-	void (*load_free)(void);
 	/*
 	 * what we pass to fuse_main is:
 	 * argv[0] -s [-f|-d] -o allow_other,directio argv[1] NULL
@@ -922,42 +975,13 @@ int main(int argc, char *argv[])
 	if ((pidfd = set_pidfile(pidfile)) < 0)
 		goto out;
 
-	if (load_use == true) {
-		dlerror();    /* Clear any existing error */
+	if (load_use == true && start_loadavg() != 0)
+		goto out;
 
-		load_daemon = (pthread_t (*)(int)) dlsym(dlopen_handle, "load_daemon");
-		error = dlerror();
-		if (error != NULL) {
-			lxcfs_error("load_daemon fails:%s\n", error);
-			goto out;
-		}
-		pid = load_daemon(1);
-		if (pid == 0)
-			goto out;
-	}
 	if (!fuse_main(nargs, newargv, &lxcfs_ops, NULL))
 		ret = EXIT_SUCCESS;
-	if (load_use == true) {
-		s = pthread_cancel(pid);
-		if (s == 0) {
-			s = pthread_join(pid, NULL); /* Make sure sub thread has been canceled. */
-			if (s != 0) {
-				lxcfs_error("%s\n", "load_free error!");
-				goto out;
-			}
-			dlerror();    /* Clear any existing error */
-
-			load_free = (void (*)(void)) dlsym(dlopen_handle, "load_free");
-			error = dlerror();
-			if (error != NULL) {
-				lxcfs_error("load_free error: %s\n", error);
-				goto out;
-			}
-			load_free();
-		} else {
-			lxcfs_error("%s\n", "load_free error!");
-		}
-	}
+	if (load_use == true)
+		stop_loadavg();
 
 out:
 	if (dlopen_handle)
