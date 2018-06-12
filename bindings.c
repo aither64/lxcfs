@@ -4825,6 +4825,8 @@ static int proc_int_loadavgs_read(char *buf, size_t size, off_t offset,
 		return -EPERM;
 	}
 
+	printf("hey, I'm updated!\n");
+
 	for (i = 0; i < LOAD_SIZE; i++) {
 		pthread_mutex_lock(&load_hash[i].lock);
 		if (load_hash[i].next == NULL) {
