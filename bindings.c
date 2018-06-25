@@ -4204,6 +4204,21 @@ static void add_proc_stat_node(struct cg_proc_stat *new_node)
 	}
 }
 
+static void reset_proc_stat_node(struct cg_proc_stat *node, struct cpuacct_usage *usage, int cpu_count)
+{
+	int i;
+
+	memcpy(node->usage, usage, sizeof(struct cpuacct_usage) * cpu_count);
+
+	for (i = 0; i < cpu_count; i++) {
+		node->view[i].user = 0;
+		node->view[i].system = 0;
+		node->view[i].idle = 0;
+	}
+
+	node->cpu_count = cpu_count;
+}
+
 static int cpu_view_proc_stat(const char *cg, const char *cpuset, struct cpuacct_usage *cg_cpu_usage, FILE *f, char *buf, size_t buf_size)
 {
 	char *line = NULL;
@@ -4286,9 +4301,12 @@ static int cpu_view_proc_stat(const char *cg, const char *cpuset, struct cpuacct
 	}
 
 	/*
-	 * TODO: if the new values are LOWER than values stored in history, it means
-	 * the container has been restarted and we should reset stored values!
+	 * If the new values are LOWER than values stored in memory, it means
+	 * the cgroup has been reset/recreated and we should reset too.
 	 */
+	if (cg_cpu_usage[0].user < stat_node->usage[0].user)
+		reset_proc_stat_node(stat_node, cg_cpu_usage, nprocs);
+
 	total_sum = diff_cpu_usage(stat_node->usage, cg_cpu_usage, diff, cpu_cnt);
 
 	for (curcpu = 0; curcpu < cpu_cnt; curcpu++) {
