@@ -3667,7 +3667,7 @@ err:
  */
 int max_cpu_count(const char *cg)
 {
-	int rv;
+	int rv, nprocs;
 	int64_t cfs_quota, cfs_period;
 
 	if (!read_cpu_cfs_param(cg, "quota", &cfs_quota))
@@ -3686,6 +3686,11 @@ int max_cpu_count(const char *cg)
 	 */
 	if ((cfs_quota % cfs_period) > 0)
 		rv += 1;
+
+	nprocs = get_nprocs();
+
+	if (rv > nprocs)
+		rv = nprocs;
 
 	return rv;
 }
