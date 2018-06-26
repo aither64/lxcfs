@@ -4431,6 +4431,10 @@ static int cpu_view_proc_stat(const char *cg, const char *cpuset, struct cpuacct
 		}
 	}
 
+	/* Cannot use more CPUs than is available due to cpuset */
+	if (max_cpus > cpu_cnt)
+		max_cpus = cpu_cnt;
+
 	stat_node = find_or_create_proc_stat_node(cg_cpu_usage, nprocs, cg);
 
 	if (!stat_node) {
