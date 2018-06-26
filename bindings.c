@@ -4125,13 +4125,6 @@ static unsigned long diff_cpu_usage(struct cpuacct_usage *older, struct cpuacct_
 		diff[i].system = newer[i].system - older[i].system;
 		diff[i].idle = newer[i].idle - older[i].idle;
 
-		printf("diff[%d]: user=%lu, system=%lu, idle=%lu\n",
-				i,
-				diff[i].user,
-				diff[i].system,
-				diff[i].idle
-				);
-
 		sum += diff[i].user;
 		sum += diff[i].system;
 		sum += diff[i].idle;
@@ -4149,11 +4142,7 @@ static void add_cpu_usage(unsigned long *surplus, struct cpuacct_usage *usage, u
 	if (free_space > usage->idle)
 		free_space = usage->idle;
 
-	printf("free space: %lu\n", free_space);
-	printf("free space: %lu - %lu - %lu\n", threshold, usage->user, usage->system);
 	to_add = free_space > *surplus ? *surplus : free_space;
-
-	printf("surplus: burned %lu, remains %lu\n", to_add, *surplus - to_add);
 
 	*counter += to_add;
 	usage->idle -= to_add;
@@ -4454,11 +4443,8 @@ static int cpu_view_proc_stat(const char *cg, const char *cpuset, struct cpuacct
 		stat_node->usage[curcpu].idle += diff[curcpu].idle;
 
 		if (max_cpus > 0 && curcpu >= max_cpus) {
-			printf("surplus cpu%d: %lu, %lu\n", curcpu, cg_cpu_usage[curcpu].user, cg_cpu_usage[curcpu].system);
 			user_surplus += diff[curcpu].user;
 			system_surplus += diff[curcpu].system;
-		} else {
-			printf("cpu%d, no surplus\n", curcpu);
 		}
 	}
 
@@ -4466,7 +4452,6 @@ static int cpu_view_proc_stat(const char *cg, const char *cpuset, struct cpuacct
 	if (max_cpus > 0) {
 		/* threshold = maximum usage per cpu, including idle */
 		threshold = total_sum / cpu_cnt * max_cpus;
-		printf("total_sum = %lu, max_cpus = %d, threshold = %lu\n", total_sum, max_cpus, threshold);
 
 		for (curcpu = 0; curcpu < max_cpus; curcpu++) {
 			if (diff[curcpu].user + diff[curcpu].system >= threshold)
@@ -4491,9 +4476,9 @@ static int cpu_view_proc_stat(const char *cg, const char *cpuset, struct cpuacct
 		}
 
 		if (user_surplus > 0)
-			printf("leftover user: %lu\n", user_surplus);
+			printf("leftover user: %lu for %s\n", user_surplus, cg);
 		if (system_surplus > 0)
-			printf("leftover system: %lu\n", system_surplus);
+			printf("leftover system: %lu for %s\n", system_surplus, cg);
 
 		for (curcpu = 0; curcpu < max_cpus; curcpu++) {
 			stat_node->view[curcpu].user += diff[curcpu].user;
