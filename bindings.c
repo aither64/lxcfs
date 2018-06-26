@@ -4121,9 +4121,24 @@ static unsigned long diff_cpu_usage(struct cpuacct_usage *older, struct cpuacct_
 	unsigned long sum = 0;
 
 	for (i = 0; i < cpu_count; i++) {
-		diff[i].user = newer[i].user - older[i].user;
-		diff[i].system = newer[i].system - older[i].system;
-		diff[i].idle = newer[i].idle - older[i].idle;
+		/* When cpuset is changed on the fly, the CPUs might get reordered.
+		 * We could either reset all counters, or check that the substractions
+		 * below will return expected results.
+		 */
+		if (newer[i].user > older[i].user)
+			diff[i].user = newer[i].user - older[i].user;
+		else
+			diff[i].user = 0;
+
+		if (newer[i].system > older[i].system)
+			diff[i].system = newer[i].system - older[i].system;
+		else
+			diff[i].system = 0;
+
+		if (newer[i].idle > older[i].idle)
+			diff[i].idle = newer[i].idle - older[i].idle;
+		else
+			diff[i].idle = 0;
 
 		sum += diff[i].user;
 		sum += diff[i].system;
