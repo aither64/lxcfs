@@ -4345,6 +4345,7 @@ static struct cg_proc_stat *find_or_create_proc_stat_node(struct cpuacct_usage *
 			return NULL;
 
 		node = add_proc_stat_node(node);
+		lxcfs_debug("New stat node (%d) for %s\n", cpu_count, cg);
 	}
 
 	pthread_mutex_lock(&node->lock);
@@ -4355,6 +4356,7 @@ static void reset_proc_stat_node(struct cg_proc_stat *node, struct cpuacct_usage
 {
 	int i;
 
+	lxcfs_debug("Resetting stat node for %s\n", node->cg);
 	memcpy(node->usage, usage, sizeof(struct cpuacct_usage) * cpu_count);
 
 	for (i = 0; i < cpu_count; i++) {
@@ -4491,9 +4493,9 @@ static int cpu_view_proc_stat(const char *cg, const char *cpuset, struct cpuacct
 		}
 
 		if (user_surplus > 0)
-			printf("leftover user: %lu for %s\n", user_surplus, cg);
+			lxcfs_debug("leftover user: %lu for %s\n", user_surplus, cg);
 		if (system_surplus > 0)
-			printf("leftover system: %lu for %s\n", system_surplus, cg);
+			lxcfs_debug("leftover system: %lu for %s\n", system_surplus, cg);
 
 		for (curcpu = 0; curcpu < max_cpus; curcpu++) {
 			stat_node->view[curcpu].user += diff[curcpu].user;
