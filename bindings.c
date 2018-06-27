@@ -4688,9 +4688,8 @@ static int proc_stat_read(char *buf, size_t size, off_t offset,
 	}
 
 	if (use_cpu_view(cg) && cg_cpu_usage) {
-		rv = cpu_view_proc_stat(cg, cpuset, cg_cpu_usage, f, d->buf, d->buflen);
-		memcpy(buf, d->buf, rv);
-		goto err;
+		total_len = cpu_view_proc_stat(cg, cpuset, cg_cpu_usage, f, d->buf, d->buflen);
+		goto out;
 	}
 
 	while (getline(&line, &linelen, f) != -1) {
@@ -4841,6 +4840,8 @@ static int proc_stat_read(char *buf, size_t size, off_t offset,
 
 	memmove(cache, d->buf + CPUALL_MAX_SIZE, total_len);
 	total_len += cpuall_len;
+
+out:
 	d->cached = 1;
 	d->size = total_len;
 	if (total_len > size)
